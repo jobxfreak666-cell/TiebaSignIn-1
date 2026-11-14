@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 from tieba_client import TiebaClient
+import feishu_notify
 import wechat_notify
 
 BJ_TZ = timezone(timedelta(hours=8))
@@ -24,6 +25,12 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+def notify_all(content: str) -> None:
+    """签到结果同时推送到企业微信与飞书（未配置的渠道会自动跳过）。"""
+    wechat_notify.send_markdown(content)
+    feishu_notify.send_markdown(content)
 
 
 def parse_args() -> str:
@@ -107,7 +114,7 @@ def main() -> None:
     forums = client.get_favorites()
     if not forums:
         logger.warning("未获取到关注的贴吧，签到结束")
-        wechat_notify.send_markdown("# 贴吧签到结果\n> 未获取到关注的贴吧，签到结束")
+        notify_all("# 贴吧签到结果\n> 未获取到关注的贴吧，签到结束")
         return
 
     total = len(forums)
@@ -151,20 +158,20 @@ def main() -> None:
     summary.append("================================")
     logger.info("\n".join(summary))
 
-    wechat_notify.send_markdown(build_wechat_content(total, stats))
+    notify_all(build_wechat_content(total, stats))
 
 
 if __name__ == "__main__":
     try:
         main()
     except SystemExit:
-        wechat_notify.send_markdown(
+        notify_all(
             f"# 贴吧签到结果\n> {datetime.now(BJ_TZ)} 签到异常中断，请查看 Actions 运行日志"
         )
         raise
     except Exception as e:
         logger.exception("签到过程发生未预期异常")
-        wechat_notify.send_markdown(
+        notify_all(
             f"# 贴吧签到结果\n> {datetime.now(BJ_TZ)} 签到异常：{e}"
         )
         raise
